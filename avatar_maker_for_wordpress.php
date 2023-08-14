@@ -135,56 +135,53 @@ function avatar_upload() {
   add_action('wp_ajax_avatar_upload', 'avatar_upload');
   add_action('wp_ajax_nopriv_avatar_upload', 'avatar_upload');
 
-  function avatar_compressor($attachment_id) {
-    // Get meta data
+// Compresses the image to create an avatar.
+function avatar_compressor($attachment_id) {
+    // Get attachment metadata.
     $attachment_data = wp_get_attachment_metadata($attachment_id);
 
-    // Check img size
+    // Get dimensions.
     $original_image_path = get_attached_file($attachment_id);
     $original_image_width = $attachment_data['width'];
     $original_image_height = $attachment_data['height'];
 
-    // NEW SIZE!!!
-	// (add your size if you need it (now its 150*150px))
+    // New dimensions.
     $new_image_width = ($original_image_width / $original_image_height) * 150;
     $new_image_height = 150;
 
-    // copy img
-    $original_image = imagecreatefromjpeg($original_image_path);
+    // Create an Imagick object.
+    $image = new Imagick($original_image_path);
 
-    // making new img
-    $new_image = imagecreatetruecolor($new_image_width, $new_image_height);
+    // Resize the image.
+    $image->resizeImage($new_image_width, $new_image_height, Imagick::FILTER_LANCZOS, 1);
 
-    // change old img and new one
-    imagecopyresampled($new_image, $original_image, 0, 0, 0, 0, $new_image_width, $new_image_height, $original_image_width, $original_image_height);
-
-    // making new part
+    // New path and filename.
     $upload_dir = wp_upload_dir();
     $new_image_filename = $upload_dir['path'] . '/' . basename($original_image_path) . '-avatar.jpg';
 
-    // SAVING
-    imagejpeg($new_image, $new_image_filename);
+    // Save the modified image.
+    $image->writeImage($new_image_filename);
 
-    // чистим память и удаляем старый img
-    imagedestroy($original_image);
-    imagedestroy($new_image);
+    // Free memory.
+    $image->destroy();
+
+    // Clear memory and delete the old image.
     wp_delete_attachment($attachment_id, true);
 
-    // URL & attachment ID 
+    // Return an array with the URL and ID of the compressed image.
     $new_attachment_id = wp_insert_attachment(array(
         'guid' => $upload_dir['url'] . '/' . basename($new_image_filename),
         'post_mime_type' => 'image/jpeg',
-        'post_title' => preg_replace( '/\.[^.]+$/', '', basename( $new_image_filename ) ),
+        'post_title' => preg_replace('/\.[^.]+$/', '', basename($new_image_filename)),
         'post_content' => '',
         'post_status' => 'inherit'
     ), $new_image_filename);
 
     return array($upload_dir['url'] . '/' . basename($new_image_filename), $new_attachment_id);
-
-    die();
 }
 
-add_action('wp_ajax_add_files_rooms', 'avatar_compressor');
-add_action('wp_ajax_nopriv_add_files_rooms', 'avatar_compressor');
+add_action('wp_ajax_avatar_compressor', 'avatar_compressor');
+add_action('wp_ajax_nopriv_avatar_compressor', 'avatar_compressor');
+
 
 ?>
